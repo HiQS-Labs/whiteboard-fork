@@ -1,0 +1,23 @@
+services:
+  review-hub:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: whiteboard-review-hub:latest
+    container_name: whiteboard-review-hub
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    environment:
+      - REVIEW_HUB_PORT=8787
+      - REVIEW_HUB_HOST=0.0.0.0
+      - REVIEW_HUB_ORIGIN=${REVIEW_HUB_ORIGIN:-http://localhost:8787}
+      - REVIEW_HUB_TOKEN=${REVIEW_HUB_TOKEN:-test-hub-token}
+      - REVIEW_HUB_USER=${REVIEW_HUB_USER:-team}
+      - REVIEW_HUB_PASSWORD=${REVIEW_HUB_PASSWORD:-secret123}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+    volumes:
+      - review-hub-data:/data
+
+volumes:
+  review-hub-data:
