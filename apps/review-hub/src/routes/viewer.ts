@@ -738,9 +738,15 @@ pnpm review share</code></pre>
   <script>
     const shareId = ${JSON.stringify(shareId)};
     let capability = window.location.hash ? window.location.hash.slice(1) : "";
+    let objQuery = capability ? "?shareId=" + encodeURIComponent(shareId) + "&token=" + encodeURIComponent(capability) : "";
     let reviewData = null;
     let diffMode = "unified"; // "unified" | "split"
     let parsedDiffs = [];
+
+    function getObjectUrl(objectId) {
+      if (!objectId) return "";
+      return "/objects/" + encodeURIComponent(objectId) + objQuery;
+    }
 
     function switchTab(name) {
       document.querySelectorAll(".tab").forEach((t, i) => {
@@ -807,19 +813,22 @@ pnpm review share</code></pre>
         const manifest = data.manifest;
 
         document.getElementById("review-title").textContent = manifest.title || "Untitled Review";
-        const objQuery = capability ? "?shareId=" + encodeURIComponent(shareId) + "&token=" + encodeURIComponent(capability) : "";
+        if (window.location.hash) {
+          capability = window.location.hash.slice(1);
+        }
+        objQuery = capability ? "?shareId=" + encodeURIComponent(shareId) + "&token=" + encodeURIComponent(capability) : "";
 
         // Fetch Snapshot Object
         let snapshot = null;
         if (manifest.snapshot) {
-          const snapRes = await fetch("/objects/" + manifest.snapshot + objQuery);
+          const snapRes = await fetch(getObjectUrl(manifest.snapshot));
           if (snapRes.ok) snapshot = await snapRes.json();
         }
 
         // Fetch Presentation Object
         let presentation = null;
         if (manifest.presentation) {
-          const presRes = await fetch("/objects/" + manifest.presentation + objQuery);
+          const presRes = await fetch(getObjectUrl(manifest.presentation));
           if (presRes.ok) presentation = await presRes.json();
         }
 
@@ -828,7 +837,7 @@ pnpm review share</code></pre>
         if (manifest.resources) {
           for (const r of manifest.resources) {
             if (r.kind === "trace") {
-              const trRes = await fetch("/objects/" + r.object + objQuery);
+              const trRes = await fetch(getObjectUrl(r.object));
               if (trRes.ok) traces.set(r.id, await trRes.json());
             }
           }
@@ -908,7 +917,7 @@ pnpm review share</code></pre>
           if (imgObj) {
             html += \`
               <div class="doc-section" style="text-align:center">
-                <img src="/objects/\${imgObj}\${objQuery}" alt="\${escapeHtml(block.alt || "")}" style="max-width:100%;border-radius:6px;border:1px solid #30363d">
+                <img src="\${getObjectUrl(imgObj)}" alt="\${escapeHtml(block.alt || "")}" style="max-width:100%;border-radius:6px;border:1px solid #30363d">
                 \${block.alt ? '<div style="font-size:12px;color:#8b949e;margin-top:6px">' + escapeHtml(block.alt) + '</div>' : ''}
               </div>
             \`;
