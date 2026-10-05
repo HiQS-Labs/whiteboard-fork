@@ -6,6 +6,7 @@ import { serve } from "@hono/node-server";
 import { SharedReviewStore } from "@review/sharing/import.js";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { logger as honoLogger } from "hono/logger";
 import pino from "pino";
 
 import { HubStore, openHubDatabase } from "./db.js";
@@ -77,6 +78,7 @@ export function createReviewHubApp(options: ReviewHubOptions = {}) {
 
   // Basic middleware
   app.use("*", cors());
+  app.use("*", honoLogger());
 
   // Health check
   app.get("/healthz", (c) => c.json({ status: "ok", timestamp: Date.now() }));
@@ -104,6 +106,8 @@ export function createReviewHubApp(options: ReviewHubOptions = {}) {
   // 6. Mount Viewer routes
   const viewerRoutes = createViewerRoutes({
     db,
+    publicOrigin,
+    hubToken,
     auth: { username: viewerUser, password: viewerPassword },
   });
 

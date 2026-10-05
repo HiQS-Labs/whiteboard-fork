@@ -139,4 +139,15 @@ export class HubStore {
 
     return result.changes > 0;
   }
+
+  listCompletedShares(limit = 50): ShareRecord[] {
+    const rows = this.db
+      .prepare(
+        "SELECT * FROM shares WHERE status = 'completed' AND revoked_at IS NULL ORDER BY created_at DESC LIMIT ?",
+      )
+      .all(limit);
+
+    // SAFETY: SQLite rows from shares table contain SQLOutputValue fields.
+    return rows.map((r) => toShareRecord(r as Record<string, SQLOutputValue>));
+  }
 }
