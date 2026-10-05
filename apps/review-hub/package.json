@@ -8,6 +8,7 @@
     "start": "node dist/server.mjs",
     "dev": "tsx src/server.ts",
     "test": "vitest run",
+    "test:ui": "node ../../scripts/ui-smoke-test.mjs",
     "typecheck": "pnpm -w exec tsc --noEmit -p apps/review-hub"
   },
   "dependencies": {

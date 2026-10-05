@@ -1329,22 +1329,33 @@ pnpm review share</code></pre>
 
       if (node.sourceRanges && Array.isArray(node.sourceRanges)) {
         for (const sr of node.sourceRanges) {
-          if (sr.file) files.add(sr.file);
+          if (sr && sr.file) files.add(String(sr.file));
         }
       }
 
       if (node.coverage && Array.isArray(node.coverage.files)) {
         for (const f of node.coverage.files) {
-          files.add(f);
+          if (typeof f === "string") {
+            files.add(f);
+          } else if (f && typeof f.path === "string") {
+            files.add(f.path);
+          } else if (f && typeof f.file === "string") {
+            files.add(f.file);
+          }
         }
       }
 
       for (const diff of parsedDiffs) {
-        const filePath = diff.newPath || diff.oldPath;
+        const filePath = typeof diff === "string" ? diff : (diff.file || diff.newPath || diff.oldPath || "");
 
-        if (filePath && [...files].some(f => filePath.endsWith(f) || f.endsWith(filePath))) {
-          additions += diff.additions || 0;
-          deletions += diff.deletions || 0;
+        if (filePath) {
+          for (const f of files) {
+            if (filePath.endsWith(f) || f.endsWith(filePath)) {
+              additions += diff.additions || 0;
+              deletions += diff.deletions || 0;
+              break;
+            }
+          }
         }
       }
 
@@ -1839,13 +1850,17 @@ pnpm review share</code></pre>
                 </a>
               </div>
             \`).join("")}
-            \${(node.coverage?.files || []).map(f => \`
-              <div style="font-family: monospace; font-size: 11px; margin-bottom: 4px;">
-                <a href="#" onclick="jumpToFileDiff('\${escapeHtml(f)}'); return false;" style="color: #58a6ff; text-decoration: none;">
-                  📁 \${escapeHtml(f)} &nearr;
-                </a>
-              </div>
-            \`).join("")}
+            \${(node.coverage?.files || []).map(f => {
+              const filePath = typeof f === "string" ? f : (f && (f.path || f.file) ? (f.path || f.file) : "");
+              if (!filePath) return "";
+              return \`
+                <div style="font-family: monospace; font-size: 11px; margin-bottom: 4px;">
+                  <a href="#" onclick="jumpToFileDiff('\${escapeHtml(filePath)}'); return false;" style="color: #58a6ff; text-decoration: none;">
+                    📁 \${escapeHtml(filePath)} &nearr;
+                  </a>
+                </div>
+              \`;
+            }).join("")}
           </div>
         \` : ""}
 
