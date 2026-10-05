@@ -45,7 +45,11 @@ export function basicAuthMiddleware(
   password?: string,
 ): MiddlewareHandler {
   return async (c: Context, next) => {
-    if (!username || !password) {
+    if ((username && !password) || (!username && password)) {
+      return c.text("Authentication configuration incomplete", 503);
+    }
+
+    if (!username && !password) {
       return next();
     }
 

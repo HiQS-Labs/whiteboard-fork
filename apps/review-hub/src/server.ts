@@ -59,12 +59,7 @@ export function createReviewHubApp(options: ReviewHubOptions = {}) {
 
   // 2. Initialize Object Storage
   const storage = new ObjectStorage(homeDir);
-
-  storage
-    .init()
-    .catch((err) =>
-      logger.error({ err }, "Failed to initialize object storage"),
-    );
+  storage.initSync();
 
   // 3. Initialize SharedReviewStore with custom Git fetcher
   const gitFetcher = createHubGitFetcher(githubToken);
@@ -99,6 +94,7 @@ export function createReviewHubApp(options: ReviewHubOptions = {}) {
     db,
     storage,
     publicOrigin,
+    auth: { username: viewerUser, password: viewerPassword },
   });
 
   app.route("/", sharedRoutes);

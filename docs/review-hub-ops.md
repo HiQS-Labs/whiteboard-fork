@@ -39,15 +39,27 @@
    sudo chown root:root /etc/review-hub.env
    ```
 
-3. Install systemd service unit:
+3. Generate Caddy Basic Auth password hash:
+   ```bash
+   caddy hash-password --plaintext "<choose-password>"
+   # Example output: $2a$14$abc...
+   ```
+   Export this hash into Caddy's systemd environment (e.g. via `/etc/systemd/system/caddy.service.d/override.conf` or `/etc/caddy/Caddyfile` directly):
+   ```ini
+   [Service]
+   Environment="REVIEW_HUB_BASIC_AUTH_HASH=$2a$14$abc..."
+   ```
+
+4. Install systemd service unit:
    ```bash
    sudo cp deploy/review-hub.service /etc/systemd/system/
    sudo systemctl daemon-reload
    sudo systemctl enable review-hub
    ```
 
-4. Append `deploy/Caddyfile.snippet` into the host's `/etc/caddy/Caddyfile` and reload Caddy:
+5. Append `deploy/Caddyfile.snippet` into the host's `/etc/caddy/Caddyfile` and reload Caddy:
    ```bash
+   sudo systemctl daemon-reload
    sudo systemctl reload caddy
    ```
 
@@ -67,8 +79,8 @@ Deployments are shipped as prebuilt tarballs without building on the VM:
    ```bash
    scp dist-release/dev.fast-review-hub-0.1.0.tgz <vm-user>@<staging-vm-ip>:/tmp/
    
-   # On the VM:
-   sudo tar -xzf /tmp/dev.fast-review-hub-0.1.0.tgz -C /var/lib/review-hub/
+   # On the VM (strip npm pack top-level 'package/' directory):
+   sudo tar -xzf /tmp/dev.fast-review-hub-0.1.0.tgz -C /var/lib/review-hub/ --strip-components=1
    sudo chown -R review-hub:review-hub /var/lib/review-hub
    sudo systemctl restart review-hub
    ```

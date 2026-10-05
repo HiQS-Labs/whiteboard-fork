@@ -44,7 +44,7 @@ Commit: a4b0451f (main) · Mode: grep+read (codebase-memory not installed for th
 | Capability link `<origin>/s/:id#cap` | humans, desktop intake | format change | `review-share-protocol/src/index.ts:153-176` |
 | `/reviews-api` + `x-review-token` + `/watch` NDJSON | canvas, CLI agents, MCP | route/auth drift | `review-protocol/src/contracts.ts`, `review-api/http.ts` |
 | `ReviewCanvasBridge` / `ReviewRuntimeConfig` | any canvas host | bridge surface change | `review-protocol/src/contracts.ts:98`, `app/src/host/review-session.tsx` |
-| Env: `DEV_REVIEW_SHARE_ORIGIN|TOKEN`, `DEV_REVIEW_HOME`, `DEV_REVIEW_SERVER_DIR`, `DEV_FAST_REVIEW_SERVER_*` | publishers, hosts | rename/semantic change | Lane C finding 13 |
+| Env: `DEV_REVIEW_SHARE_ORIGIN` / `TOKEN`, `DEV_REVIEW_HOME`, `DEV_REVIEW_SERVER_DIR`, `DEV_FAST_REVIEW_SERVER_*` | publishers, hosts | rename/semantic change | Lane C finding 13 |
 
 ## Build, failure and rollback today
 
