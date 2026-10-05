@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,6 +27,8 @@ export interface ReviewHubOptions {
   githubToken?: string;
   viewerUser?: string;
   viewerPassword?: string;
+  signingSecret?: string;
+  dev?: boolean;
 }
 
 export function createReviewHubApp(options: ReviewHubOptions = {}) {
@@ -49,6 +52,13 @@ export function createReviewHubApp(options: ReviewHubOptions = {}) {
 
   const viewerPassword =
     options.viewerPassword ?? process.env.REVIEW_HUB_PASSWORD;
+
+  const signingSecret =
+    options.signingSecret ??
+    process.env.REVIEW_HUB_SIGNING_SECRET ??
+    randomBytes(32).toString("hex");
+
+  const isDev = options.dev === true || process.env.NODE_ENV === "development";
 
   const logger = pino({ level: process.env.LOG_LEVEL ?? "info" });
 
@@ -85,6 +95,8 @@ export function createReviewHubApp(options: ReviewHubOptions = {}) {
     sharedStore,
     publicOrigin,
     hubToken,
+    signingSecret,
+    dev: isDev,
   });
 
   app.route("/", publishRoutes);
@@ -94,6 +106,7 @@ export function createReviewHubApp(options: ReviewHubOptions = {}) {
     db,
     storage,
     publicOrigin,
+    signingSecret,
     auth: { username: viewerUser, password: viewerPassword },
   });
 

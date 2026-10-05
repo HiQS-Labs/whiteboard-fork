@@ -57,7 +57,7 @@ export function createViewerRoutes(deps: ViewerRouteDeps) {
                 }
               }
 
-              const viewUrl = `/s/${encodeURIComponent(s.id)}${s.capability ? "#" + s.capability : ""}`;
+              const viewUrl = `/s/${encodeURIComponent(s.id)}`;
               const dateStr = new Date(s.created_at).toLocaleString();
 
               return `
@@ -226,7 +226,7 @@ export function createViewerRoutes(deps: ViewerRouteDeps) {
       </div>
       <pre><code># 1. Set environment variables
 export WHITEBOARD_SHARE_HUB="${origin}"
-export WHITEBOARD_SHARE_TOKEN="${deps.hubToken || "&lt;your-hub-token&gt;"}"
+export WHITEBOARD_SHARE_TOKEN="&lt;your-hub-token&gt;"
 
 # 2. Share the active review
 pnpm review share</code></pre>
@@ -862,7 +862,6 @@ pnpm review share</code></pre>
   <script>
     const shareId = ${JSON.stringify(shareId)};
     let capability = window.location.hash ? window.location.hash.slice(1) : "";
-    let objQuery = capability ? "?shareId=" + encodeURIComponent(shareId) + "&token=" + encodeURIComponent(capability) : "";
     let reviewData = null;
     let diffMode = "unified"; // "unified" | "split"
     let parsedDiffs = [];
@@ -876,7 +875,29 @@ pnpm review share</code></pre>
 
     function getObjectUrl(objectId) {
       if (!objectId) return "";
-      return "/objects/" + encodeURIComponent(objectId) + objQuery;
+      return "/objects/" + encodeURIComponent(objectId) + (shareId ? "?shareId=" + encodeURIComponent(shareId) : "");
+    }
+
+    function objectFetch(objectId) {
+      const headers = {};
+      if (capability) {
+        headers["x-review-share-token"] = capability;
+      }
+      if (shareId) {
+        headers["x-review-share-id"] = shareId;
+      }
+      return fetch(getObjectUrl(objectId), { headers });
+    }
+
+    async function getSignedObjectUrl(objectId) {
+      const headers = capability ? { "x-review-share-token": capability } : {};
+      const res = await fetch(
+        "/api/shared/" + encodeURIComponent(shareId) + "/objects/" + encodeURIComponent(objectId),
+        { headers },
+      );
+      if (!res.ok) return "";
+      const data = await res.json();
+      return data.url || "";
     }
 
     function switchTab(name) {
@@ -957,6 +978,10 @@ pnpm review share</code></pre>
         .replace(/'/g, "&#39;");
     }
 
+    function jsArg(v) {
+      return escapeHtml(JSON.stringify(String(v == null ? "" : v)));
+    }
+
     function renderMarkdown(md) {
       if (!md) return "";
       let html = escapeHtml(md);
@@ -990,19 +1015,18 @@ pnpm review share</code></pre>
         if (window.location.hash) {
           capability = window.location.hash.slice(1);
         }
-        objQuery = capability ? "?shareId=" + encodeURIComponent(shareId) + "&token=" + encodeURIComponent(capability) : "";
 
         // Fetch Snapshot Object
         let snapshot = null;
         if (manifest.snapshot) {
-          const snapRes = await fetch(getObjectUrl(manifest.snapshot));
+          const snapRes = await objectFetch(manifest.snapshot);
           if (snapRes.ok) snapshot = await snapRes.json();
         }
 
         // Fetch Presentation Object
         let presentation = null;
         if (manifest.presentation) {
-          const presRes = await fetch(getObjectUrl(manifest.presentation));
+          const presRes = await objectFetch(manifest.presentation);
           if (presRes.ok) presentation = await presRes.json();
         }
 
@@ -1011,7 +1035,7 @@ pnpm review share</code></pre>
         if (manifest.resources) {
           for (const r of manifest.resources) {
             if (r.kind === "trace") {
-              const trRes = await fetch(getObjectUrl(r.object));
+              const trRes = await objectFetch(r.object);
               if (trRes.ok) traces.set(r.id, await trRes.json());
             }
           }
@@ -1029,7 +1053,7 @@ pnpm review share</code></pre>
         reviewData = { manifest, snapshot, presentation, traces };
 
         // 1. Render Document
-        renderDocument(snapshot, traces, manifest);
+        await renderDocument(snapshot, traces, manifest);
 
         // 2. Render Diffs
         extractAndRenderDiffs(presentation);
@@ -1056,7 +1080,7 @@ pnpm review share</code></pre>
       }
     }
 
-    function renderDocument(snapshot, traces, manifest) {
+    async function renderDocument(snapshot, traces, manifest) {
       const container = document.getElementById("tab-doc");
       if (!snapshot || !snapshot.document) {
         container.innerHTML = '<div class="doc-section"><p>No document content available in this review.</p></div>';
@@ -1089,12 +1113,15 @@ pnpm review share</code></pre>
         } else if (block.type === "image") {
           const imgObj = manifest.resources?.find(r => r.id === block.assetId)?.object;
           if (imgObj) {
-            html += \`
-              <div class="doc-section" style="text-align:center">
-                <img src="\${getObjectUrl(imgObj)}" alt="\${escapeHtml(block.alt || "")}" style="max-width:100%;border-radius:6px;border:1px solid #30363d">
-                \${block.alt ? '<div style="font-size:12px;color:#8b949e;margin-top:6px">' + escapeHtml(block.alt) + '</div>' : ''}
-              </div>
-            \`;
+            const imageUrl = capability ? await getSignedObjectUrl(imgObj) : getObjectUrl(imgObj);
+            if (imageUrl) {
+              html += \`
+                <div class="doc-section" style="text-align:center">
+                  <img src="\${escapeHtml(imageUrl)}" alt="\${escapeHtml(block.alt || "")}" style="max-width:100%;border-radius:6px;border:1px solid #30363d">
+                  \${block.alt ? '<div style="font-size:12px;color:#8b949e;margin-top:6px">' + escapeHtml(block.alt) + '</div>' : ''}
+                </div>
+              \`;
+            }
           }
         } else if (block.type === "software_map") {
           html += \`
@@ -1606,7 +1633,7 @@ pnpm review share</code></pre>
           const typeBadgeX = hasDiff ? el.absX + el._w - typeBadgeW - 75 : el.absX + el._w - typeBadgeW - 10;
 
           groupsSvg += \`
-            <g class="map-node-interactive" data-path="\${escapeHtml(el.path)}" onclick="handleNodeClick(event, '\${escapeHtml(el.path)}')">
+            <g class="map-node-interactive" data-path="\${escapeHtml(el.path)}" onclick="handleNodeClick(event, \${jsArg(el.path)})">
               <rect x="\${el.absX}" y="\${el.absY}" width="\${el._w}" height="\${el._h}" rx="8" ry="8"
                     fill="\${theme.bg}" stroke="\${hasDiff ? '#3fb950' : theme.border}" stroke-width="\${hasDiff ? 2 : 1.5}" />
               <rect x="\${el.absX}" y="\${el.absY}" width="\${el._w}" height="36" rx="8" ry="8" fill="\${theme.headerBg}" />
@@ -1629,7 +1656,7 @@ pnpm review share</code></pre>
           }
 
           leavesSvg += \`
-            <g class="map-node-interactive" data-path="\${escapeHtml(el.path)}" onclick="handleNodeClick(event, '\${escapeHtml(el.path)}')">
+            <g class="map-node-interactive" data-path="\${escapeHtml(el.path)}" onclick="handleNodeClick(event, \${jsArg(el.path)})">
               <rect x="\${el.absX}" y="\${el.absY}" width="\${el._w}" height="\${el._h}" rx="6" ry="6"
                     fill="\${theme.bg}" stroke="\${hasDiff ? '#3fb950' : theme.border}" stroke-width="\${hasDiff ? 2 : 1.5}" />
               <text x="\${el.absX + 10}" y="\${el.absY + 22}" fill="#f0f6fc" font-weight="600" font-size="12" font-family="system-ui, sans-serif">
@@ -1831,7 +1858,7 @@ pnpm review share</code></pre>
               \${diffStats.deletions > 0 ? \`<span class="map-badge-del">-\${diffStats.deletions} lines</span>\` : ""}
             </div>
             \${diffStats.files.length > 0 ? \`
-              <button class="map-jump-btn" onclick="jumpToFileDiff('\${escapeHtml(diffStats.files[0])}')">
+              <button class="map-jump-btn" onclick="jumpToFileDiff(\${jsArg(diffStats.files[0])})">
                 Jump to Diff &rarr;
               </button>
             \` : ""}
@@ -1845,7 +1872,7 @@ pnpm review share</code></pre>
             <div style="font-size: 12px; font-weight: 600; color: #f0f6fc; margin-bottom: 6px;">Source Code</div>
             \${(node.sourceRanges || []).map(sr => \`
               <div style="font-family: monospace; font-size: 11px; margin-bottom: 4px;">
-                <a href="#" onclick="jumpToFileDiff('\${escapeHtml(sr.file)}'); return false;" style="color: #58a6ff; text-decoration: none;">
+                <a href="#" onclick="jumpToFileDiff(\${jsArg(sr.file)}); return false;" style="color: #58a6ff; text-decoration: none;">
                   📄 \${escapeHtml(sr.file)}:L\${sr.fromLine}-L\${sr.toLine} &nearr;
                 </a>
               </div>
@@ -1855,7 +1882,7 @@ pnpm review share</code></pre>
               if (!filePath) return "";
               return \`
                 <div style="font-family: monospace; font-size: 11px; margin-bottom: 4px;">
-                  <a href="#" onclick="jumpToFileDiff('\${escapeHtml(filePath)}'); return false;" style="color: #58a6ff; text-decoration: none;">
+                  <a href="#" onclick="jumpToFileDiff(\${jsArg(filePath)}); return false;" style="color: #58a6ff; text-decoration: none;">
                     📁 \${escapeHtml(filePath)} &nearr;
                   </a>
                 </div>
@@ -1871,7 +1898,7 @@ pnpm review share</code></pre>
               <div style="font-size: 11px; color: #8b949e; margin-bottom: 4px;">Called by:</div>
               \${inbound.map(r => \`
                 <div style="font-size: 11px; margin-bottom: 4px; padding: 4px 6px; background: #0d1117; border-radius: 4px;">
-                  <a href="#" onclick="selectMapNode('\${escapeHtml(r.sourcePath)}'); return false;" style="color: #58a6ff; text-decoration: none;">
+                  <a href="#" onclick="selectMapNode(\${jsArg(r.sourcePath)}); return false;" style="color: #58a6ff; text-decoration: none;">
                     &larr; \${escapeHtml(r.sourcePath)}
                   </a>
                   \${r.label ? \`<span style="color: #8b949e;"> (\${escapeHtml(r.label)})</span>\` : ""}
@@ -1882,7 +1909,7 @@ pnpm review share</code></pre>
               <div style="font-size: 11px; color: #8b949e; margin-top: 6px; margin-bottom: 4px;">Calls:</div>
               \${outbound.map(r => \`
                 <div style="font-size: 11px; margin-bottom: 4px; padding: 4px 6px; background: #0d1117; border-radius: 4px;">
-                  <a href="#" onclick="selectMapNode('\${escapeHtml(r.targetPath)}'); return false;" style="color: #58a6ff; text-decoration: none;">
+                  <a href="#" onclick="selectMapNode(\${jsArg(r.targetPath)}); return false;" style="color: #58a6ff; text-decoration: none;">
                     &rarr; \${escapeHtml(r.targetPath)}
                   </a>
                   \${r.label ? \`<span style="color: #8b949e;"> (\${escapeHtml(r.label)})</span>\` : ""}
@@ -1970,7 +1997,7 @@ pnpm review share</code></pre>
                   \` : ""}
                   \${el.sourceRanges ? el.sourceRanges.map(sr => \`
                     <div class="element-meta" style="color: #3fb950;">
-                      &bull; Source: <a href="#" onclick="jumpToFileDiff('\${escapeHtml(sr.file)}'); return false;" style="color: #58a6ff; text-decoration: none;">\${escapeHtml(sr.file)}:L\${sr.fromLine}-L\${sr.toLine}</a>
+                      &bull; Source: <a href="#" onclick="jumpToFileDiff(\${jsArg(sr.file)}); return false;" style="color: #58a6ff; text-decoration: none;">\${escapeHtml(sr.file)}:L\${sr.fromLine}-L\${sr.toLine}</a>
                     </div>
                   \`).join("") : ""}
                 </div>

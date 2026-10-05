@@ -110,22 +110,17 @@ export class HubStore {
       .run(manifestJson, id);
   }
 
-  completeShare(input: {
-    id: string;
-    capability: string;
-    capabilityHash: string;
-    url: string;
-  }): void {
+  completeShare(input: { id: string; capabilityHash: string }): void {
     this.db
       .prepare(
         `UPDATE shares
          SET status = 'completed',
-             capability = ?,
+             capability = NULL,
              capability_hash = ?,
-             url = ?
+             url = NULL
          WHERE id = ?`,
       )
-      .run(input.capability, input.capabilityHash, input.url, input.id);
+      .run(input.capabilityHash, input.id);
   }
 
   revokeShare(id: string): boolean {

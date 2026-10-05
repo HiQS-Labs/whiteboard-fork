@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
 
 import {
   MAX_SHARE_BYTES,
@@ -13,7 +13,7 @@ import type { SharedReviewStore } from "@review/sharing/import.js";
 import { Hono } from "hono";
 import { z } from "zod";
 
-import { hashCapability, publisherAuth } from "../auth.js";
+import { constantTimeEqual, hashCapability, publisherAuth } from "../auth.js";
 import type { HubStore } from "../db.js";
 import type { ObjectStorage } from "../storage.js";
 
@@ -31,14 +31,36 @@ interface PublishRouteDeps {
   sharedStore?: SharedReviewStore;
   publicOrigin: string;
   hubToken?: string;
+  signingSecret?: string;
+  dev?: boolean;
 }
 
 export function createPublishRoutes(deps: PublishRouteDeps) {
   const router = new Hono();
+  const signingSecret = deps.signingSecret || randomBytes(32).toString("hex");
 
   // Protect all /api/shares mutations with publisher bearer auth
-  router.use("/api/shares/*", publisherAuth(deps.hubToken));
-  router.use("/api/shares", publisherAuth(deps.hubToken));
+  router.use("/api/shares/*", publisherAuth(deps.hubToken, deps.dev));
+  router.use("/api/shares", publisherAuth(deps.hubToken, deps.dev));
+
+  const generateManifestUpload = (id: string) => {
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+    const sig = createHmac("sha256", signingSecret)
+      .update(`upload-manifest:${id}:${expiresAt}`)
+      .digest("hex");
+
+    const uploadUrl = `${deps.publicOrigin}/uploads/${id}/manifest?sig=${sig}&expires=${encodeURIComponent(expiresAt)}`;
+
+    return {
+      url: uploadUrl,
+      headers: {
+        "x-review-upload-sig": sig,
+        "x-review-upload-expires": expiresAt,
+      },
+      expiresAt,
+    };
+  };
 
   // 1. Initiate Share
   router.post("/api/shares", async (c) => {
@@ -59,15 +81,21 @@ export function createPublishRoutes(deps: PublishRouteDeps) {
     const existing = deps.db.getShareByRequestId(requestId);
 
     if (existing) {
-      const uploadUrl = `${deps.publicOrigin}/uploads/${existing.id}/manifest`;
+      if (existing.status !== "pending") {
+        return c.json(
+          {
+            error: {
+              code: "INVALID_STATE",
+              message: "Share is already completed or revoked.",
+            },
+          },
+          409,
+        );
+      }
 
       return c.json({
         shareId: existing.id,
-        upload: {
-          url: uploadUrl,
-          headers: {},
-          expiresAt: "2099-01-01T00:00:00Z",
-        },
+        upload: generateManifestUpload(existing.id),
       });
     }
 
@@ -79,21 +107,55 @@ export function createPublishRoutes(deps: PublishRouteDeps) {
       manifestSha256: manifest.sha256,
     });
 
-    const uploadUrl = `${deps.publicOrigin}/uploads/${shareId}/manifest`;
-
     return c.json({
       shareId,
-      upload: {
-        url: uploadUrl,
-        headers: {},
-        expiresAt: "2099-01-01T00:00:00Z",
-      },
+      upload: generateManifestUpload(shareId),
     });
   });
 
   // 2. Upload manifest
   router.put("/uploads/:shareId/manifest", async (c) => {
     const shareId = c.req.param("shareId");
+    const sig = c.req.query("sig") || c.req.header("x-review-upload-sig");
+
+    const expires =
+      c.req.query("expires") || c.req.header("x-review-upload-expires");
+
+    const authHeader = c.req.header("authorization");
+
+    let isAuthorized = false;
+
+    // Check bearer token if provided
+    if (authHeader && authHeader.startsWith("Bearer ") && deps.hubToken) {
+      const token = authHeader.slice("Bearer ".length).trim();
+
+      if (constantTimeEqual(token, deps.hubToken)) {
+        isAuthorized = true;
+      }
+    }
+
+    // Check signed upload token
+    if (!isAuthorized && sig && expires) {
+      const expectedSig = createHmac("sha256", signingSecret)
+        .update(`upload-manifest:${shareId}:${expires}`)
+        .digest("hex");
+
+      if (sig === expectedSig && new Date(expires).getTime() >= Date.now()) {
+        isAuthorized = true;
+      }
+    }
+
+    if (!isAuthorized) {
+      return c.json(
+        {
+          error: {
+            code: "UNAUTHORIZED",
+            message: "Missing or invalid upload authorization.",
+          },
+        },
+        401,
+      );
+    }
 
     const share = deps.db.getShare(shareId);
 
@@ -101,6 +163,18 @@ export function createPublishRoutes(deps: PublishRouteDeps) {
       return c.json(
         { error: { code: "NOT_FOUND", message: "Share not found." } },
         404,
+      );
+    }
+
+    if (share.status !== "pending") {
+      return c.json(
+        {
+          error: {
+            code: "INVALID_STATE",
+            message: "Share is no longer pending.",
+          },
+        },
+        409,
       );
     }
 
@@ -153,6 +227,18 @@ export function createPublishRoutes(deps: PublishRouteDeps) {
       );
     }
 
+    if (share.status !== "pending") {
+      return c.json(
+        {
+          error: {
+            code: "INVALID_STATE",
+            message: "Share is no longer pending.",
+          },
+        },
+        409,
+      );
+    }
+
     let manifest: ShareManifest;
 
     try {
@@ -196,11 +282,20 @@ export function createPublishRoutes(deps: PublishRouteDeps) {
       { url: string; headers: Record<string, string>; expiresAt: string }
     > = {};
 
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
     for (const object of manifest.objects) {
+      const sig = createHmac("sha256", signingSecret)
+        .update(`upload-object:${shareId}:${object.id}:${expiresAt}`)
+        .digest("hex");
+
       uploads[object.id] = {
-        url: `${deps.publicOrigin}/uploads/${shareId}/object/${object.id}`,
-        headers: {},
-        expiresAt: "2099-01-01T00:00:00Z",
+        url: `${deps.publicOrigin}/uploads/${shareId}/object/${object.id}?sig=${sig}&expires=${encodeURIComponent(expiresAt)}`,
+        headers: {
+          "x-review-upload-sig": sig,
+          "x-review-upload-expires": expiresAt,
+        },
+        expiresAt,
       };
     }
 
@@ -212,7 +307,111 @@ export function createPublishRoutes(deps: PublishRouteDeps) {
 
   // 4. Upload object
   router.put("/uploads/:shareId/object/:objectId", async (c) => {
+    const shareId = c.req.param("shareId");
     const objectId = c.req.param("objectId");
+    const sig = c.req.query("sig") || c.req.header("x-review-upload-sig");
+
+    const expires =
+      c.req.query("expires") || c.req.header("x-review-upload-expires");
+
+    const authHeader = c.req.header("authorization");
+
+    let isAuthorized = false;
+
+    // Check bearer token if provided
+    if (authHeader && authHeader.startsWith("Bearer ") && deps.hubToken) {
+      const token = authHeader.slice("Bearer ".length).trim();
+
+      if (constantTimeEqual(token, deps.hubToken)) {
+        isAuthorized = true;
+      }
+    }
+
+    // Check signed upload token
+    if (!isAuthorized && sig && expires) {
+      const expectedSig = createHmac("sha256", signingSecret)
+        .update(`upload-object:${shareId}:${objectId}:${expires}`)
+        .digest("hex");
+
+      if (sig === expectedSig && new Date(expires).getTime() >= Date.now()) {
+        isAuthorized = true;
+      }
+    }
+
+    if (!isAuthorized) {
+      return c.json(
+        {
+          error: {
+            code: "UNAUTHORIZED",
+            message: "Missing or invalid upload authorization.",
+          },
+        },
+        401,
+      );
+    }
+
+    const share = deps.db.getShare(shareId);
+
+    if (!share) {
+      return c.json(
+        { error: { code: "NOT_FOUND", message: "Share not found." } },
+        404,
+      );
+    }
+
+    if (share.status !== "pending") {
+      return c.json(
+        {
+          error: {
+            code: "INVALID_STATE",
+            message: "Share is no longer pending.",
+          },
+        },
+        409,
+      );
+    }
+
+    if (!share.manifest_json) {
+      return c.json(
+        {
+          error: {
+            code: "INVALID_STATE",
+            message: "Share manifest has not been uploaded.",
+          },
+        },
+        400,
+      );
+    }
+
+    let manifest: ShareManifest;
+
+    try {
+      manifest = JSON.parse(share.manifest_json);
+    } catch {
+      return c.json(
+        {
+          error: {
+            code: "INVALID_MANIFEST",
+            message: "Stored manifest is invalid JSON.",
+          },
+        },
+        500,
+      );
+    }
+
+    const declared = manifest.objects?.find((o) => o.id === objectId);
+
+    if (!declared) {
+      return c.json(
+        {
+          error: {
+            code: "UNDECLARED_OBJECT",
+            message: "Object ID was not declared in manifest.",
+          },
+        },
+        400,
+      );
+    }
 
     const arrayBuffer = await c.req.arrayBuffer();
 
@@ -222,6 +421,18 @@ export function createPublishRoutes(deps: PublishRouteDeps) {
       return c.json(
         { error: { code: "OVERSIZE", message: "Object exceeds size limit." } },
         413,
+      );
+    }
+
+    if (bytes.byteLength !== declared.size) {
+      return c.json(
+        {
+          error: {
+            code: "SIZE_MISMATCH",
+            message: "Object size does not match declared size.",
+          },
+        },
+        400,
       );
     }
 
@@ -255,8 +466,25 @@ export function createPublishRoutes(deps: PublishRouteDeps) {
       );
     }
 
-    if (share.status === "completed" && share.url) {
-      return c.json({ shareId: share.id, url: share.url });
+    if (share.revoked_at || share.status === "revoked") {
+      return c.json(
+        { error: { code: "REVOKED", message: "Share has been revoked." } },
+        404,
+      );
+    }
+
+    if (share.status === "completed") {
+      // Idempotent retry: mint fresh capability, replace hash, return link
+      const capability = randomBytes(32).toString("base64url");
+      const capHash = hashCapability(capability);
+      const link = `${deps.publicOrigin}/s/${shareId}#${capability}`;
+
+      deps.db.completeShare({
+        id: shareId,
+        capabilityHash: capHash,
+      });
+
+      return c.json({ shareId: share.id, url: link });
     }
 
     const manifest: ShareManifest = JSON.parse(share.manifest_json);
@@ -283,9 +511,7 @@ export function createPublishRoutes(deps: PublishRouteDeps) {
 
     deps.db.completeShare({
       id: shareId,
-      capability,
       capabilityHash: capHash,
-      url: link,
     });
 
     // Import into SharedReviewStore if mounted
@@ -315,14 +541,30 @@ export function createPublishRoutes(deps: PublishRouteDeps) {
 
     const share = deps.db.getShare(shareId);
 
-    if (!share || share.status !== "completed" || !share.url) {
+    if (!share || share.status !== "completed") {
       return c.json(
         { error: { code: "NOT_COMPLETED", message: "Share not completed." } },
         409,
       );
     }
 
-    return c.json({ shareId: share.id, url: share.url });
+    if (share.revoked_at) {
+      return c.json(
+        { error: { code: "REVOKED", message: "Share has been revoked." } },
+        404,
+      );
+    }
+
+    const capability = randomBytes(32).toString("base64url");
+    const capHash = hashCapability(capability);
+    const link = `${deps.publicOrigin}/s/${shareId}#${capability}`;
+
+    deps.db.completeShare({
+      id: shareId,
+      capabilityHash: capHash,
+    });
+
+    return c.json({ shareId: share.id, url: link });
   });
 
   // 7. Revoke Share

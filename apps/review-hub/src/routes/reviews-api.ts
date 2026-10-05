@@ -18,10 +18,19 @@ export function createReviewsApiRouter(deps: ReviewsApiDeps) {
   const router = new Hono();
 
   // Basic auth guard for viewer (rejects with 503 if credentials are incomplete)
-  router.use(
-    "*",
-    basicAuthMiddleware(deps.auth?.username, deps.auth?.password),
-  );
+  if (
+    (deps.auth?.username && !deps.auth?.password) ||
+    (!deps.auth?.username && deps.auth?.password)
+  ) {
+    router.use("*", async (c) =>
+      c.text("Authentication configuration incomplete", 503),
+    );
+  } else if (deps.auth?.username && deps.auth?.password) {
+    router.use(
+      "*",
+      basicAuthMiddleware(deps.auth.username, deps.auth.password),
+    );
+  }
 
   // Open the local store and data context
   const local = openLocalReviewStore(deps.reviewDbPath);

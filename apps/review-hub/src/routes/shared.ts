@@ -1,8 +1,9 @@
 import { createHmac, randomBytes } from "node:crypto";
 
+import type { Context } from "hono";
 import { Hono } from "hono";
 
-import { hashCapability } from "../auth.js";
+import { constantTimeEqual, hashCapability } from "../auth.js";
 import type { HubStore } from "../db.js";
 import type { ObjectStorage } from "../storage.js";
 
@@ -37,15 +38,52 @@ export function createSharedRoutes(deps: SharedRouteDeps) {
       return null;
     }
 
-    if (share.capability && share.capability === token) {
+    if (
+      share.capability_hash &&
+      constantTimeEqual(share.capability_hash, hashCapability(token))
+    ) {
       return share;
     }
 
-    if (
-      share.capability_hash &&
-      share.capability_hash === hashCapability(token)
-    ) {
-      return share;
+    return null;
+  };
+
+  // Helper to authenticate via capability token or Basic auth
+  const authenticateViewer = (c: Context, shareId: string) => {
+    const token = c.req.header("x-review-share-token") || c.req.query("token");
+
+    const tokenShare = authenticateToken(shareId, token);
+
+    if (tokenShare) {
+      return tokenShare;
+    }
+
+    if (deps.auth?.username && deps.auth?.password) {
+      const authHeader = c.req.header("authorization");
+
+      if (authHeader && authHeader.startsWith("Basic ")) {
+        const credentials = Buffer.from(authHeader.slice(6), "base64").toString(
+          "utf-8",
+        );
+
+        const colonIndex = credentials.indexOf(":");
+
+        if (colonIndex !== -1) {
+          const user = credentials.slice(0, colonIndex);
+          const pass = credentials.slice(colonIndex + 1);
+
+          if (
+            constantTimeEqual(user, deps.auth.username) &&
+            constantTimeEqual(pass, deps.auth.password)
+          ) {
+            const share = deps.db.getShare(shareId);
+
+            if (share && !share.revoked_at && share.status === "completed") {
+              return share;
+            }
+          }
+        }
+      }
     }
 
     return null;
@@ -54,9 +92,7 @@ export function createSharedRoutes(deps: SharedRouteDeps) {
   // 1. Get shared manifest and metadata
   router.get("/api/shared/:shareId", (c) => {
     const shareId = c.req.param("shareId");
-    const token = c.req.header("x-review-share-token");
-
-    const share = authenticateToken(shareId, token);
+    const share = authenticateViewer(c, shareId);
 
     if (!share || !share.manifest_json) {
       return c.json(
@@ -78,16 +114,38 @@ export function createSharedRoutes(deps: SharedRouteDeps) {
   router.get("/api/shared/:shareId/objects/:objectId", (c) => {
     const shareId = c.req.param("shareId");
     const objectId = c.req.param("objectId");
-    const token = c.req.header("x-review-share-token");
+    const share = authenticateViewer(c, shareId);
 
-    const share = authenticateToken(shareId, token);
-
-    if (!share) {
+    if (!share || !share.manifest_json) {
       return c.json(
         {
           error: { code: "NOT_FOUND", message: "Share not found or revoked." },
         },
         404,
+      );
+    }
+
+    try {
+      const m = JSON.parse(share.manifest_json);
+
+      const objectBelongs =
+        m.objects?.some((o: { id: string }) => o.id === objectId) ||
+        m.snapshot === objectId ||
+        m.presentation === objectId ||
+        m.resources?.some((r: { object: string }) => r.object === objectId);
+
+      if (!objectBelongs) {
+        return c.json(
+          {
+            error: { code: "NOT_FOUND", message: "Object not found in share." },
+          },
+          404,
+        );
+      }
+    } catch {
+      return c.json(
+        { error: { code: "INVALID_MANIFEST", message: "Invalid manifest." } },
+        500,
       );
     }
 
@@ -109,57 +167,54 @@ export function createSharedRoutes(deps: SharedRouteDeps) {
     const shareId = c.req.query("shareId") || c.req.header("x-review-share-id");
     const expires = c.req.query("expires");
     const sig = c.req.query("sig");
-    const token = c.req.query("token") || c.req.header("x-review-share-token");
+
+    if (!shareId) {
+      return c.text("Unauthorized: share ID required", 401);
+    }
+
+    const share = deps.db.getShare(shareId);
+
+    if (!share || share.revoked_at || share.status !== "completed") {
+      return c.text("Unauthorized: share not found or revoked", 404);
+    }
+
+    if (!share.manifest_json) {
+      return c.text("Object not found", 404);
+    }
+
+    try {
+      const manifest = JSON.parse(share.manifest_json);
+
+      const objectBelongs =
+        manifest.objects?.some((o: { id: string }) => o.id === objectId) ||
+        manifest.snapshot === objectId ||
+        manifest.presentation === objectId ||
+        manifest.resources?.some(
+          (r: { object: string }) => r.object === objectId,
+        );
+
+      if (!objectBelongs) {
+        return c.text("Object not found in this share", 404);
+      }
+    } catch {
+      return c.text("Invalid manifest", 500);
+    }
 
     let isAuthorized = false;
 
-    // Check basic auth if configured and provided
-    if (deps.auth?.username && deps.auth?.password) {
-      const authHeader = c.req.header("authorization");
-
-      if (authHeader && authHeader.startsWith("Basic ")) {
-        const credentials = Buffer.from(authHeader.slice(6), "base64").toString(
-          "utf-8",
-        );
-
-        const [user, pass] = credentials.split(":");
-
-        if (user === deps.auth.username && pass === deps.auth.password) {
-          isAuthorized = true;
-        }
-      }
-    }
-
     // Check signed URL
-    if (!isAuthorized && sig && expires && shareId) {
+    if (sig && expires) {
       const expectedSig = createHmac("sha256", signingSecret)
         .update(`${shareId}:${objectId}:${expires}`)
         .digest("hex");
 
       if (sig === expectedSig && new Date(expires).getTime() >= Date.now()) {
-        const share = deps.db.getShare(shareId);
-
-        if (share && !share.revoked_at) {
-          isAuthorized = true;
-        }
-      }
-    }
-
-    // Check capability token
-    if (!isAuthorized && shareId && token) {
-      if (authenticateToken(shareId, token) !== null) {
         isAuthorized = true;
       }
     }
 
-    // If no viewer auth was configured, allow read if shareId + token are valid or if in dev mode
-    if (
-      !isAuthorized &&
-      !deps.auth?.username &&
-      !deps.auth?.password &&
-      !sig &&
-      !token
-    ) {
+    // Check capability or basic auth via authenticateViewer
+    if (!isAuthorized && authenticateViewer(c, shareId) !== null) {
       isAuthorized = true;
     }
 

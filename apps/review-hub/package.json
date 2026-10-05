@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node ../../packages/review/node_modules/tsdown/dist/run.mjs src/server.ts",
+    "build": "tsdown src/server.ts",
     "start": "node dist/server.mjs",
     "dev": "tsx src/server.ts",
     "test": "vitest run",
