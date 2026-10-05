@@ -1,0 +1,49 @@
+import { createReviewApi } from "@review/review-api/http.js";
+import { openLocalReviewStore } from "@review/review-api/local-data.js";
+import type { SharedReviewStore } from "@review/sharing/import.js";
+import { Hono } from "hono";
+
+import { basicAuthMiddleware } from "../auth.js";
+
+interface ReviewsApiDeps {
+  reviewDbPath: string;
+  sharedStore: SharedReviewStore;
+  auth?: {
+    username?: string;
+    password?: string;
+  };
+}
+
+export function createReviewsApiRouter(deps: ReviewsApiDeps) {
+  const router = new Hono();
+
+  // Basic auth guard for viewer if configured
+  if (deps.auth?.username && deps.auth?.password) {
+    router.use(
+      "*",
+      basicAuthMiddleware(deps.auth.username, deps.auth.password),
+    );
+  }
+
+  // Open the local store and data context
+  const local = openLocalReviewStore(deps.reviewDbPath);
+  deps.sharedStore.connect(local.store, local.data);
+
+  // Mount existing review API with shared store
+  const api = createReviewApi(
+    local.store,
+    local.data,
+    undefined,
+    deps.sharedStore,
+  );
+
+  router.route("/", api);
+
+  return {
+    router,
+    close: () => {
+      local.store.close();
+      local.data.close();
+    },
+  };
+}
