@@ -1,5 +1,5 @@
 # Multi-stage build for Review Hub
-FROM node:22-bookworm-slim AS builder
+FROM node:24-bookworm-slim AS builder
 
 WORKDIR /build
 
@@ -17,7 +17,7 @@ RUN pnpm --filter @dev.fast/review build:workspace-deps
 RUN pnpm --filter @dev.fast/review-hub build
 
 # Production runtime stage
-FROM node:22-bookworm-slim AS runner
+FROM node:24-bookworm-slim AS runner
 
 WORKDIR /app
 

@@ -15,21 +15,25 @@ async function main() {
   const fixtureRoot = await mkdtemp(path.join(tmpdir(), "seed-fixture-"));
   const fixture = await createShareFixture(fixtureRoot);
 
-  const bundle = await exportShare({
-    store: fixture.store,
-    data: fixture.data,
-    reviewId: fixture.reviewId,
-    repository: fixture.repository,
-  });
+  try {
+    const bundle = await exportShare({
+      store: fixture.store,
+      data: fixture.data,
+      reviewId: fixture.reviewId,
+      repository: fixture.repository,
+    });
 
-  const client = new ShareClient(hubUrl, hubToken);
-  const result = await client.create(bundle);
+    const client = new ShareClient(hubUrl, hubToken);
+    const result = await client.create(bundle);
 
-  console.log("\nSuccess! Sample review created:");
-  console.log(`Review ID:   ${result.shareId}`);
-  console.log(`Review URL:  ${result.url}`);
-
-  await rm(fixtureRoot, { recursive: true, force: true });
+    console.log("\nSuccess! Sample review created:");
+    console.log(`Review ID:   ${result.shareId}`);
+    console.log(`Review URL:  ${result.url}`);
+  } finally {
+    fixture.store.close();
+    fixture.data.close();
+    await rm(fixtureRoot, { recursive: true, force: true });
+  }
 }
 
 main().catch((err) => {

@@ -13,6 +13,15 @@ interface ViewerRouteDeps {
   };
 }
 
+function escapeHtmlServer(str: string | number | null | undefined): string {
+  return String(str == null ? "" : str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export function createViewerRoutes(deps: ViewerRouteDeps) {
   const router = new Hono();
 
@@ -63,8 +72,8 @@ export function createViewerRoutes(deps: ViewerRouteDeps) {
               return `
                 <div class="review-item">
                   <div>
-                    <a class="review-title" href="${viewUrl}">${title}</a>
-                    <div class="review-meta">${dateStr}${repo ? " &middot; " + repo : ""}</div>
+                    <a class="review-title" href="${viewUrl}">${escapeHtmlServer(title)}</a>
+                    <div class="review-meta">${escapeHtmlServer(dateStr)}${repo ? " &middot; " + escapeHtmlServer(repo) : ""}</div>
                   </div>
                   <a class="btn" href="${viewUrl}">Open Review &rarr;</a>
                 </div>
@@ -970,7 +979,7 @@ pnpm review share</code></pre>
     }
 
     function escapeHtml(str) {
-      return String(str || "")
+      return String(str == null ? "" : str)
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
@@ -1186,8 +1195,8 @@ pnpm review share</code></pre>
                 <span>📄 \${escapeHtml(file.file)}</span>
               </div>
               <div class="diff-stats-badge">
-                <span class="stat-add">+\${file.additions || 0}</span>
-                <span class="stat-del">-\${file.deletions || 0}</span>
+                <span class="stat-add">+\${escapeHtml(file.additions || 0)}</span>
+                <span class="stat-del">-\${escapeHtml(file.deletions || 0)}</span>
               </div>
             </div>
             \${renderFileHunks(file.hunks)}
@@ -1209,7 +1218,7 @@ pnpm review share</code></pre>
     function renderUnifiedHunks(hunks) {
       let rows = "";
       for (const hunk of hunks) {
-        rows += \`<tr><td colspan="4" class="hunk-header">@@ -\${hunk.startLine || 1} +\${hunk.startLine || 1} @@</td></tr>\`;
+        rows += \`<tr><td colspan="4" class="hunk-header">@@ -\${escapeHtml(hunk.startLine || 1)} +\${escapeHtml(hunk.startLine || 1)} @@</td></tr>\`;
         for (const line of (hunk.lines || [])) {
           const isAdd = line.kind === "add";
           const isDel = line.kind === "remove";
@@ -1220,9 +1229,9 @@ pnpm review share</code></pre>
 
           rows += \`
             <tr class="\${rowClass}">
-              <td class="line-num">\${oldNum}</td>
-              <td class="line-num">\${newNum}</td>
-              <td class="line-marker">\${marker}</td>
+              <td class="line-num">\${escapeHtml(oldNum)}</td>
+              <td class="line-num">\${escapeHtml(newNum)}</td>
+              <td class="line-marker">\${escapeHtml(marker)}</td>
               <td>\${escapeHtml(line.text)}</td>
             </tr>
           \`;
@@ -1234,7 +1243,7 @@ pnpm review share</code></pre>
     function renderSplitHunks(hunks) {
       let rows = "";
       for (const hunk of hunks) {
-        rows += \`<tr><td colspan="6" class="hunk-header">@@ -\${hunk.startLine || 1} +\${hunk.startLine || 1} @@</td></tr>\`;
+        rows += \`<tr><td colspan="6" class="hunk-header">@@ -\${escapeHtml(hunk.startLine || 1)} +\${escapeHtml(hunk.startLine || 1)} @@</td></tr>\`;
         for (const line of (hunk.lines || [])) {
           const isAdd = line.kind === "add";
           const isDel = line.kind === "remove";
@@ -1242,7 +1251,7 @@ pnpm review share</code></pre>
           if (isDel) {
             rows += \`
               <tr>
-                <td class="line-num line-del">\${line.oldLine || ""}</td>
+                <td class="line-num line-del">\${escapeHtml(line.oldLine || "")}</td>
                 <td class="line-marker line-del">-</td>
                 <td class="split-col line-del">\${escapeHtml(line.text)}</td>
                 <td class="line-num"></td>
@@ -1256,7 +1265,7 @@ pnpm review share</code></pre>
                 <td class="line-num"></td>
                 <td class="line-marker"></td>
                 <td class="split-col"></td>
-                <td class="line-num line-add">\${line.newLine || ""}</td>
+                <td class="line-num line-add">\${escapeHtml(line.newLine || "")}</td>
                 <td class="line-marker line-add">+</td>
                 <td class="split-col line-add">\${escapeHtml(line.text)}</td>
               </tr>
@@ -1264,10 +1273,10 @@ pnpm review share</code></pre>
           } else {
             rows += \`
               <tr class="line-context">
-                <td class="line-num">\${line.oldLine || ""}</td>
+                <td class="line-num">\${escapeHtml(line.oldLine || "")}</td>
                 <td class="line-marker"> </td>
                 <td class="split-col">\${escapeHtml(line.text)}</td>
-                <td class="line-num">\${line.newLine || ""}</td>
+                <td class="line-num">\${escapeHtml(line.newLine || "")}</td>
                 <td class="line-marker"> </td>
                 <td class="split-col">\${escapeHtml(line.text)}</td>
               </tr>
@@ -1873,7 +1882,7 @@ pnpm review share</code></pre>
             \${(node.sourceRanges || []).map(sr => \`
               <div style="font-family: monospace; font-size: 11px; margin-bottom: 4px;">
                 <a href="#" onclick="jumpToFileDiff(\${jsArg(sr.file)}); return false;" style="color: #58a6ff; text-decoration: none;">
-                  📄 \${escapeHtml(sr.file)}:L\${sr.fromLine}-L\${sr.toLine} &nearr;
+                  📄 \${escapeHtml(sr.file)}:L\${escapeHtml(sr.fromLine)}-L\${escapeHtml(sr.toLine)} &nearr;
                 </a>
               </div>
             \`).join("")}
@@ -1975,7 +1984,7 @@ pnpm review share</code></pre>
             Software Architecture Map Outline
           </div>
           <div style="font-size: 12px; color: #8b949e; margin-bottom: 16px;">
-            Commit: <code style="font-family: monospace; color: #58a6ff;">\${map.commit ? map.commit.slice(0, 10) : "head"}</code>
+            Commit: <code style="font-family: monospace; color: #58a6ff;">\${map.commit ? escapeHtml(map.commit.slice(0, 10)) : "head"}</code>
           </div>
           <div style="border-top: 1px solid #30363d; padding-top: 12px;">
             \${(map.elements || []).map(el => {
@@ -1991,13 +2000,13 @@ pnpm review share</code></pre>
                   <div class="element-meta">Path: \${escapeHtml(el.path)}</div>
                   \${hasDiff ? \`
                     <div style="margin-top: 4px;">
-                      \${diffStats.additions > 0 ? \`<span class="map-badge-add">+\${diffStats.additions}</span> \` : ""}
-                      \${diffStats.deletions > 0 ? \`<span class="map-badge-del">-\${diffStats.deletions}</span>\` : ""}
+                      \${diffStats.additions > 0 ? \`<span class="map-badge-add">+\${escapeHtml(diffStats.additions)}</span> \` : ""}
+                      \${diffStats.deletions > 0 ? \`<span class="map-badge-del">-\${escapeHtml(diffStats.deletions)}</span>\` : ""}
                     </div>
                   \` : ""}
                   \${el.sourceRanges ? el.sourceRanges.map(sr => \`
                     <div class="element-meta" style="color: #3fb950;">
-                      &bull; Source: <a href="#" onclick="jumpToFileDiff(\${jsArg(sr.file)}); return false;" style="color: #58a6ff; text-decoration: none;">\${escapeHtml(sr.file)}:L\${sr.fromLine}-L\${sr.toLine}</a>
+                      &bull; Source: <a href="#" onclick="jumpToFileDiff(\${jsArg(sr.file)}); return false;" style="color: #58a6ff; text-decoration: none;">\${escapeHtml(sr.file)}:L\${escapeHtml(sr.fromLine)}-L\${escapeHtml(sr.toLine)}</a>
                     </div>
                   \`).join("") : ""}
                 </div>
