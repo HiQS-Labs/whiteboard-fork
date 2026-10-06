@@ -1,0 +1,28 @@
+[Unit]
+Description=Whiteboard Review Hub Service
+After=network.target
+
+[Service]
+Type=simple
+User=review-hub
+Group=review-hub
+WorkingDirectory=/var/lib/review-hub
+Environment=NODE_ENV=production
+Environment=REVIEW_HUB_HOME=/var/lib/review-hub
+Environment=REVIEW_HUB_PORT=8787
+Environment=REVIEW_HUB_HOST=127.0.0.1
+# Configure credentials in /etc/review-hub.env
+EnvironmentFile=-/etc/review-hub.env
+ExecStart=/usr/bin/node /var/lib/review-hub/dist/server.mjs
+Restart=on-failure
+RestartSec=5s
+
+# Security hardening
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/review-hub
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
