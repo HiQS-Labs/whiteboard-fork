@@ -74,6 +74,11 @@ Deployments are shipped as prebuilt tarballs without building on the VM:
    node scripts/pack-review-hub.mjs
    # Output: dist-release/dev.fast-review-hub-0.1.0.tgz
    ```
+   The hub's `build` script first builds the review canvas
+   (`pnpm --filter @dev.fast/review-canvas build:hub`, the same React app the
+   Desktop embeds, bundled standalone) and copies it to `dist/canvas`, so the
+   tarball carries the viewer. `REVIEW_HUB_CANVAS_DIR` points the server at a
+   different build if needed.
 
 2. **Copy and extract on the VM:**
    ```bash
@@ -110,3 +115,23 @@ https://reviews.staging.ltvera.com/s/<share-id>#<capability>
 ```
 
 Open the link in any modern browser, log in with the team Basic Auth credentials, and view the review complete with document, maps, and live Git diffs.
+
+---
+
+## 4. Review Canvas
+
+`/s/<share-id>` serves the Whiteboard review canvas from `packages/review/app`
+(entry `src/hub-entry.tsx`), mounted against the share through the same
+`/reviews-api` routes the Desktop uses. Two Desktop-native surfaces are web
+fallbacks on the hub: inline code peeks render the pinned file as highlighted
+text, and the Diff tab diffs both sides of each file in the browser.
+
+Code peeks and the Diff tab need the share's repository checked out on the hub
+(`GITHUB_TOKEN` with read access) and the structural-diff binary, which
+Whiteboard Desktop bundles. On the VM, either run
+`pnpm --filter @dev.fast/review ensure:diffr` in the checkout that produced the
+tarball and ship `packages/review/bin/diffr` alongside, or set
+`REVIEW_DIFFR_BINARY=/path/to/diffr` in `/etc/review-hub.env`.
+
+The canvas polls `/s/<share-id>/session` until the checkout is ready, so a
+freshly published share shows a short loading state before its first render.

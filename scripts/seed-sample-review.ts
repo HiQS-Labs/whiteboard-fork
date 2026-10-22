@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { ShareClient } from "@review/sharing/client.js";
 import { exportShare } from "@review/sharing/export.js";
+
 import { createShareFixture } from "../packages/review/test/fixtures/share/create.js";
 
 async function main() {
@@ -12,8 +13,17 @@ async function main() {
 
   console.log(`Publishing sample review to ${hubUrl}...`);
 
-  const fixtureRoot = await mkdtemp(path.join(tmpdir(), "seed-fixture-"));
+  // SEED_FIXTURE_ROOT keeps the sender repository on disk so a hub whose Git
+  // config maps the fixture's GitHub URL to it (url.<root>/sender-repository.insteadOf)
+  // can check the pinned commits out and render code.
+  const keepRoot = process.env.SEED_FIXTURE_ROOT;
+
+  const fixtureRoot =
+    keepRoot ?? (await mkdtemp(path.join(tmpdir(), "seed-fixture-")));
+
   const fixture = await createShareFixture(fixtureRoot);
+
+  if (keepRoot) console.log(`Sender repository kept at ${fixture.repo}`);
 
   try {
     const bundle = await exportShare({
@@ -32,7 +42,8 @@ async function main() {
   } finally {
     fixture.store.close();
     fixture.data.close();
-    await rm(fixtureRoot, { recursive: true, force: true });
+
+    if (!keepRoot) await rm(fixtureRoot, { recursive: true, force: true });
   }
 }
 

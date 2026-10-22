@@ -50,7 +50,7 @@ The deployment target will be a **new staging/dev GCP GCE VM** running Debian 12
 - [ ] **Step 0.1:** Scaffold minimal spike server in `apps/review-hub` with Hono + `@hono/node-server`.
 - [ ] **Step 0.2:** Implement upload routes (`POST /api/shares`, presigned `PUT`, `/manifest`, `/complete`, `/link`, `/api/shared/*`).
 - [ ] **Step 0.3:** Configure Git credentials for `BinoidCBD/LTVera-Pandas` and verify `fetchPinnedRepository` succeeds for a test pin.
-- [ ] **Step 0.4:** Build standalone canvas entry (`hub-entry.tsx`) and serve static viewer assets.
+- [x] **Step 0.4:** Build standalone canvas entry (`hub-entry.tsx`) and serve static viewer assets.
 - [ ] **Step 0.5:** Mount `/reviews-api` read routes over `SharedReviewStore` and add Basic Auth.
 - [ ] **Step 0.6:** Run end-to-end smoke test on localhost with a real review from `LTVera-Pandas`. Verify document, maps, and code diffs render without error.
 
@@ -61,7 +61,7 @@ The deployment target will be a **new staging/dev GCP GCE VM** running Debian 12
 - [ ] **Step 1.4:** Add automated round-trip tests modeled after `headless-sharing.test.ts`.
 
 ### Phase 2: Web Viewer Refinement
-- [ ] **Step 2.1:** Finalize `hub-entry.tsx` bridge to handle fragment capabilities securely.
+- [x] **Step 2.1:** Finalize `hub-entry.tsx` bridge to handle fragment capabilities securely.
 - [ ] **Step 2.2:** Stub write-shaped canvas routes (progress, viewed, coverage) with 204s or static responses.
 - [ ] **Step 2.3:** Verify cross-browser rendering in Chromium, Safari, and Firefox.
 

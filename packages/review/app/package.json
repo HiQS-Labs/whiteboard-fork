@@ -14,7 +14,8 @@
     "typecheck": "pnpm -w exec tsc --noEmit -p packages/review/app",
     "pretest:node": "pnpm --filter @dev.fast/review ensure:tutorial-assets",
     "pretest:browser": "pnpm --filter @dev.fast/review ensure:tutorial-assets",
-    "pretypecheck": "pnpm --filter @dev.fast/review ensure:tutorial-assets"
+    "pretypecheck": "pnpm --filter @dev.fast/review ensure:tutorial-assets",
+    "build:hub": "vite build --config hub.vite.config.ts"
   },
   "dependencies": {
     "@dev.fast/review": "workspace:*",

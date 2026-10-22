@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,17 +10,25 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger as honoLogger } from "hono/logger";
 import pino from "pino";
+import { z } from "zod";
 
 import { HubStore, openHubDatabase } from "./db.js";
 import { createHubGitFetcher } from "./git.js";
+import { createDashboardRoutes } from "./routes/dashboard.js";
 import { createPublishRoutes } from "./routes/publish.js";
 import { createReviewsApiRouter } from "./routes/reviews-api.js";
 import { createSharedRoutes } from "./routes/shared.js";
 import { createViewerRoutes } from "./routes/viewer.js";
 import { ObjectStorage } from "./storage.js";
 
+const { version: HUB_VERSION } = z
+  .object({ version: z.string() })
+  .parse(createRequire(import.meta.url)("../package.json"));
+
 export interface ReviewHubOptions {
   homeDir?: string;
+  /** The built canvas directory; defaults to the packed or workspace build. */
+  canvasDir?: string;
   port?: number;
   host?: string;
   publicOrigin?: string;
@@ -112,15 +121,27 @@ export function createReviewHubApp(options: ReviewHubOptions = {}) {
 
   app.route("/", sharedRoutes);
 
-  // 6. Mount Viewer routes
-  const viewerRoutes = createViewerRoutes({
-    db,
-    publicOrigin,
-    hubToken,
-    auth: { username: viewerUser, password: viewerPassword },
-  });
+  // 6. Mount the dashboard and the review canvas
+  app.route(
+    "/",
+    createDashboardRoutes({
+      db,
+      publicOrigin,
+      auth: { username: viewerUser, password: viewerPassword },
+    }),
+  );
 
-  app.route("/", viewerRoutes);
+  app.route(
+    "/",
+    createViewerRoutes({
+      db,
+      sharedStore,
+      publicOrigin,
+      appVersion: HUB_VERSION,
+      canvasDir: options.canvasDir ?? process.env.REVIEW_HUB_CANVAS_DIR,
+      auth: { username: viewerUser, password: viewerPassword },
+    }),
+  );
 
   // 7. Mount /reviews-api read routes
   const reviewsApi = createReviewsApiRouter({
@@ -131,11 +152,18 @@ export function createReviewHubApp(options: ReviewHubOptions = {}) {
 
   app.route("/reviews-api", reviewsApi.router);
 
+  // Shares published before this process started live on disk; load them so
+  // their links keep working. Needs the review-api connection made above.
+  const loaded = sharedStore.load().catch((cause: unknown) => {
+    logger.error({ err: cause }, "Could not load cached shared reviews");
+  });
+
   return {
     app,
     db,
     storage,
     sharedStore,
+    loaded,
     close: () => {
       reviewsApi.close();
       dbSync.close();

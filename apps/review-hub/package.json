@@ -4,11 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsdown src/server.ts",
+    "build": "pnpm --filter @dev.fast/review-canvas build:hub && tsdown src/server.ts && node scripts/copy-canvas.mjs",
     "start": "node dist/server.mjs",
     "dev": "tsx src/server.ts",
     "test": "vitest run",
-    "test:ui": "node ../../scripts/ui-smoke-test.mjs",
     "typecheck": "pnpm -w exec tsc --noEmit -p apps/review-hub"
   },
   "dependencies": {

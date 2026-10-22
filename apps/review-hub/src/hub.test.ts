@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -18,8 +18,22 @@ describe("Review Hub MVP", () => {
 
   beforeEach(async () => {
     tempDir = await mkdtemp(path.join(tmpdir(), "review-hub-test-"));
+    // A stand-in for the built canvas: the shell only needs the manifest.
+    const canvasDir = path.join(tempDir, "canvas");
+    await mkdir(path.join(canvasDir, ".vite"), { recursive: true });
+    await writeFile(
+      path.join(canvasDir, ".vite/manifest.json"),
+      JSON.stringify({
+        "src/hub-entry.tsx": {
+          file: "assets/hub.js",
+          isEntry: true,
+          css: ["assets/hub.css"],
+        },
+      }),
+    );
     hub = createReviewHubApp({
       homeDir: tempDir,
+      canvasDir,
       publicOrigin: "https://localhost:8787",
       hubToken,
       viewerUser,
@@ -92,7 +106,22 @@ describe("Review Hub MVP", () => {
       const authRes = await hub.app.fetch(authReq);
       expect(authRes.status).toBe(200);
       const html = await authRes.text();
-      expect(html).toContain("Whiteboard Review");
+      // The canvas shell: the bundle, and the share id the entry resolves.
+      expect(html).toContain("/hub/assets/hub.js");
+      expect(html).toContain(`"shareId":"${result.shareId}"`);
+      expect(html).not.toContain(hubToken);
+
+      const sessionRes = await hub.app.fetch(
+        new Request(`https://localhost:8787/s/${result.shareId}/session`, {
+          headers: { Authorization: authHeader },
+        }),
+      );
+      expect(sessionRes.status).toBe(200);
+
+      const session = await sessionRes.json();
+
+      expect(session.reviewId).toMatch(/^shared-[a-f0-9]{64}$/);
+      expect(["ready", "pending", "error"]).toContain(session.stage);
 
       // Verify object download succeeds with capability token
       const capability = recovered.url.split("#")[1];
