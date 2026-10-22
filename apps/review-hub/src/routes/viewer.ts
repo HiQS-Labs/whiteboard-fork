@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -166,17 +166,18 @@ export function createViewerRoutes(deps: ViewerRouteDeps) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(title)}</title>
-  <link rel="stylesheet" href="/hub/${bundle.css}">
+  <link rel="stylesheet" href="/hub/${bundle.css}?v=${bundle.version}">
   <style>
-    html, body { margin: 0; height: 100%; background: #16130f; color: #e8e1d6; }
-    @media (prefers-color-scheme: light) { html, body { background: #fbf8f3; color: #1c1915; } }
+    /* Whiteboard Dark / Light editor backgrounds, so nothing shows through. */
+    html, body { margin: 0; height: 100%; background: #0c0f15; color: #eef0f4; }
+    @media (prefers-color-scheme: light) { html, body { background: #ffffff; color: #15181e; } }
     #review-hub-root { height: 100%; }
   </style>
 </head>
 <body>
   <div id="review-hub-root"></div>
   <script>window.__REVIEW_HUB__ = ${config};</script>
-  <script type="module" src="/hub/${bundle.js}"></script>
+  <script type="module" src="/hub/${bundle.js}?v=${bundle.version}"></script>
 </body>
 </html>`);
   });
@@ -188,6 +189,9 @@ interface CanvasManifest {
   dir: string;
   js: string;
   css: string;
+  /** Cache-buster: the newest mtime of the entry files. Vite's CSS hash does
+   * not track the scoped stylesheet's content, so the name alone is stale. */
+  version: string;
 }
 
 /** The hub bundle next to the server (a packed deploy), else the workspace build. */
@@ -232,7 +236,17 @@ function loadCanvasManifest(dir: string): CanvasManifest | null {
 
   if (!entry?.css?.[0]) return null;
 
-  return { dir, js: entry.file, css: entry.css[0] };
+  const version = Math.max(
+    ...[entry.file, entry.css[0]].map((asset) => {
+      try {
+        return statSync(path.join(dir, asset)).mtimeMs;
+      } catch {
+        return 0;
+      }
+    }),
+  ).toString(36);
+
+  return { dir, js: entry.file, css: entry.css[0], version };
 }
 
 const shareTitleSchema = z.object({ title: z.string().min(1).optional() });

@@ -20,7 +20,7 @@ const CONTEXT_LINES = 3;
 /** `capped` editors scroll past this many pixels. */
 const CAPPED_HEIGHT = 360;
 
-const LINE_HEIGHT = 20;
+const LINE_HEIGHT = 18;
 
 const LANGUAGE_BY_EXTENSION = new Map<string, ShjLanguage>([
   ["ts", "ts"],

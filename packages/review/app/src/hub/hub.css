@@ -1,13 +1,20 @@
 /* Web fallbacks for the Desktop's native surfaces (inline editor, diff). */
 
+/* The Desktop's Monaco metrics: 12px/18px, ligatures off. The canvas's own
+   `pre` rule sets a generic monospace, so the code elements are named here. */
 .hub-inline-editor,
-.hub-diff {
+.hub-inline-editor__code,
+.hub-diff,
+.hub-diff__body {
   font:
-    13px/20px "Geist Mono",
+    12px/18px "Geist Mono",
     ui-monospace,
     SFMono-Regular,
     Menlo,
     monospace;
+  font-feature-settings:
+    "calt" 0,
+    "liga" 0;
   color: inherit;
 }
 
