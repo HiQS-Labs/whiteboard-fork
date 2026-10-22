@@ -1,6 +1,7 @@
 # Node
 node_modules/
 dist/
+dist-release/
 packages/review/tutorial/.bundle/
 packages/review/tutorial/git-stub/
 *.tsbuildinfo

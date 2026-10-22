@@ -1,0 +1,25 @@
+# Caddy configuration snippet for Whiteboard Review Hub
+# To be included in the staging VM's Caddyfile alongside LTVera-Pandas.
+#
+# Assumes Cloudflare proxy in front with Full SSL, matching LTVera convention.
+
+reviews.staging.ltvera.com {
+	encode zstd gzip
+
+	# Basic Auth protecting review access (matches Ponytail Rung 3)
+	# Generate password hash with: caddy hash-password
+	basicauth /s/* {
+		# Example: team / $2a$14$...
+		{$REVIEW_HUB_BASIC_AUTH_USER:team} {$REVIEW_HUB_BASIC_AUTH_HASH}
+	}
+	basicauth /reviews-api/* {
+		{$REVIEW_HUB_BASIC_AUTH_USER:team} {$REVIEW_HUB_BASIC_AUTH_HASH}
+	}
+
+	# Proxy to the Review Hub loopback daemon
+	handle {
+		reverse_proxy 127.0.0.1:8787
+	}
+
+	tls internal
+}

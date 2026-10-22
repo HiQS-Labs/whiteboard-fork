@@ -47,7 +47,13 @@ const receivedSchema = z.strictObject({
 const signedUrlSchema = z.url().refine((value) => {
   const url = new URL(value);
 
-  return url.protocol === "https:" && !url.username && !url.password;
+  const isLocal = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+
+  return (
+    (url.protocol === "https:" || (url.protocol === "http:" && isLocal)) &&
+    !url.username &&
+    !url.password
+  );
 });
 
 const downloadSchema = z.strictObject({ url: z.url(), expiresAt: z.string() });
