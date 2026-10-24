@@ -1,25 +1,16 @@
-# Caddy configuration snippet for Whiteboard Review Hub
-# To be included in the staging VM's Caddyfile alongside LTVera-Pandas.
+# Caddy site block for the Whiteboard Review Hub on ltvera-staging. It lives in
+# LTVera-Pandas deploy/Caddyfile.staging, served by that stack's caddy container;
+# the hub container joins the ltvera-pandas_default network as `review-hub`
+# (deploy/docker-compose.staging.yml).
 #
-# Assumes Cloudflare proxy in front with Full SSL, matching LTVera convention.
+# Cloudflare proxies the name to the VM in SSL mode "Full", which accepts
+# Caddy's own CA. The hub enforces its own Basic Auth, so there is none here.
 
-reviews.staging.ltvera.com {
+reviews-stg.ltvera.com {
 	encode zstd gzip
 
-	# Basic Auth protecting review access (matches Ponytail Rung 3)
-	# Generate password hash with: caddy hash-password
-	basicauth /s/* {
-		# Example: team / $2a$14$...
-		{$REVIEW_HUB_BASIC_AUTH_USER:team} {$REVIEW_HUB_BASIC_AUTH_HASH}
-	}
-	basicauth /reviews-api/* {
-		{$REVIEW_HUB_BASIC_AUTH_USER:team} {$REVIEW_HUB_BASIC_AUTH_HASH}
-	}
+	import edge_access_log
 
-	# Proxy to the Review Hub loopback daemon
-	handle {
-		reverse_proxy 127.0.0.1:8787
-	}
-
+	reverse_proxy review-hub:8787
 	tls internal
 }
