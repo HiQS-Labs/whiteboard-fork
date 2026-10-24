@@ -21,6 +21,7 @@ export const hubSessionStateSchema = z.discriminatedUnion("stage", [
     reviewId: z.string(),
     version: z.number(),
     title: z.string(),
+    sourceTreeUrl: z.url().optional(),
   }),
   z.object({
     stage: z.literal("pending"),
