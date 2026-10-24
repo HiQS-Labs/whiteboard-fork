@@ -305,11 +305,11 @@ function findPattern(query: ReviewFindQuery): RegExp | null {
   }
 }
 
-type Span = { text: string; type?: string };
+export type Span = { text: string; type?: string };
 
 /** Tokenizes the whole file once, then splits the tokens back into lines so
  * multi-line tokens (block comments, template strings) keep their colour. */
-async function highlightLines(
+export async function highlightLines(
   lines: string[],
   path: string,
 ): Promise<Span[][]> {
@@ -339,7 +339,7 @@ async function highlightLines(
   return result;
 }
 
-function withFind(
+export function withFind(
   spans: Span[],
   find: ReviewFindQuery | null,
   doc: Document,

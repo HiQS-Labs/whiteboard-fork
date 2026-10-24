@@ -162,3 +162,110 @@
 .shj-syn-type {
   color: #56b6c2;
 }
+
+/* Source tree panel: the hub's stand-in for the Desktop explorer. Backgrounds
+   match the shell's Whiteboard Dark / Light so the canvas doesn't show through. */
+.hub-source-tree {
+  position: fixed;
+  inset: 44px 0 0 auto;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  width: min(1100px, 92vw);
+  background: #0c0f15;
+  color: #eef0f4;
+  border-left: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  box-shadow: -12px 0 32px rgb(0 0 0 / 0.25);
+  font:
+    13px/1.4 -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+}
+
+@media (prefers-color-scheme: light) {
+  .hub-source-tree {
+    background: #ffffff;
+    color: #15181e;
+  }
+}
+
+.hub-source-tree__header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 12px;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.hub-source-tree__title {
+  flex: 1;
+  font-weight: 600;
+}
+
+.hub-source-tree__header a {
+  color: inherit;
+  opacity: 0.75;
+}
+
+.hub-source-tree__close {
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.hub-source-tree__body {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  min-height: 0;
+  flex: 1;
+}
+
+.hub-source-tree__tree {
+  overflow: auto;
+  padding: 6px 0;
+  border-right: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.hub-source-tree__item {
+  display: block;
+  width: 100%;
+  padding: 3px 8px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.hub-source-tree__item:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.hub-source-tree__item--active {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.hub-source-tree__viewer {
+  overflow: auto;
+  min-width: 0;
+}
+
+.hub-source-tree__file-path {
+  position: sticky;
+  top: 0;
+  padding: 6px 12px;
+  background: inherit;
+  font-weight: 600;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.hub-source-tree__code {
+  overflow: visible;
+}
