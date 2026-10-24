@@ -7,13 +7,14 @@ import type {
 
 import { createWebDiffView } from "./web-diff-view";
 import { createWebInlineEditors } from "./web-inline-editor";
+import { createWebSourceTree } from "./web-source-tree";
 
 export interface HubBridgeOptions {
   reviewId: string;
   version: number;
   wasmUrl: string;
   appVersion: string;
-  /** The share's pinned head on GitHub; "Source tree" opens it. */
+  /** The share's pinned head on GitHub, linked from the source tree panel. */
   sourceTreeUrl?: string;
 }
 
@@ -22,8 +23,8 @@ const DIFF_LAYOUT_KEY = "review-hub:diff-layout";
 /**
  * The canvas bridge for a browser tab on the hub. Requests go to the same
  * origin (the browser carries the viewer's Basic Auth), the editor and diff
- * surfaces are web fallbacks, "Source tree" opens the pinned head on GitHub,
- * and host verbs that only make sense in the Desktop (focus the window,
+ * surfaces are web fallbacks, "Source tree" browses the pinned head in a
+ * panel (GitHub when it can't), and host verbs that only make sense in the Desktop (focus the window,
  * reveal a file) are acknowledged and ignored.
  */
 export function createHubBridge(options: HubBridgeOptions): ReviewCanvasBridge {
@@ -53,6 +54,11 @@ export function createHubBridge(options: HubBridgeOptions): ReviewCanvasBridge {
     request: (url: string) => request(url),
   };
 
+  const toggleSourceTree = createWebSourceTree({
+    ...sources,
+    sourceTreeUrl: options.sourceTreeUrl,
+  });
+
   return {
     config: {
       serverUrl: window.location.origin,
@@ -80,8 +86,7 @@ export function createHubBridge(options: HubBridgeOptions): ReviewCanvasBridge {
 
           return { ok: true };
         case "openSourceTree":
-          if (options.sourceTreeUrl)
-            window.open(options.sourceTreeUrl, "_blank", "noopener");
+          await toggleSourceTree();
 
           return { ok: true };
         default:
