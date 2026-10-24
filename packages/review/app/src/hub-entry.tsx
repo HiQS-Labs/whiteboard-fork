@@ -65,6 +65,7 @@ async function main() {
         version: state.version,
         wasmUrl: libavoidWasmUrl,
         appVersion: config.appVersion,
+        sourceTreeUrl: state.sourceTreeUrl,
       });
 
       // No pinned `version`: a share is immutable, so following the live

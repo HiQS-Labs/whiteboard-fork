@@ -26,7 +26,14 @@ interface ViewerRouteDeps {
 
 /** The hub's answer to `GET /s/:shareId/session`; mirrors `HubSessionState` in the canvas. */
 type SessionState =
-  | { stage: "ready"; reviewId: string; version: number; title: string }
+  | {
+      stage: "ready";
+      reviewId: string;
+      version: number;
+      title: string;
+      /** The pinned head on GitHub, for the canvas's "Source tree" button. */
+      sourceTreeUrl?: string;
+    }
   | { stage: "pending"; reviewId: string; title: string; detail: string }
   | { stage: "error"; reviewId: string; title: string; error: string };
 
@@ -101,13 +108,19 @@ export function createViewerRoutes(deps: ViewerRouteDeps) {
     }
 
     if (status.stage === "ready") {
-      const { snapshot } = deps.sharedStore.get(reviewId);
+      const { snapshot, manifest } = deps.sharedStore.get(reviewId);
+      const cloneUrl = manifest.repository?.cloneUrl;
 
       return c.json<SessionState>({
         stage: "ready",
         reviewId,
         version: snapshot.version,
         title: snapshot.title,
+        // The manifest only admits canonical `https://github.com/<owner>/<repo>.git`.
+        sourceTreeUrl:
+          cloneUrl && snapshot.pins
+            ? `${cloneUrl.replace(/\.git$/, "")}/tree/${snapshot.pins.head}`
+            : undefined,
       });
     }
 

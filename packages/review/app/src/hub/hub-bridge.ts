@@ -13,6 +13,8 @@ export interface HubBridgeOptions {
   version: number;
   wasmUrl: string;
   appVersion: string;
+  /** The share's pinned head on GitHub; "Source tree" opens it. */
+  sourceTreeUrl?: string;
 }
 
 const DIFF_LAYOUT_KEY = "review-hub:diff-layout";
@@ -20,9 +22,9 @@ const DIFF_LAYOUT_KEY = "review-hub:diff-layout";
 /**
  * The canvas bridge for a browser tab on the hub. Requests go to the same
  * origin (the browser carries the viewer's Basic Auth), the editor and diff
- * surfaces are web fallbacks, and host verbs that only make sense in the
- * Desktop (focus the window, open the source tree) are acknowledged and
- * ignored.
+ * surfaces are web fallbacks, "Source tree" opens the pinned head on GitHub,
+ * and host verbs that only make sense in the Desktop (focus the window,
+ * reveal a file) are acknowledged and ignored.
  */
 export function createHubBridge(options: HubBridgeOptions): ReviewCanvasBridge {
   // Absolute against the bare origin: a relative URL would inherit any
@@ -77,9 +79,14 @@ export function createHubBridge(options: HubBridgeOptions): ReviewCanvasBridge {
           window.open("https://discord.gg/wYvd2cpMQg", "_blank", "noopener");
 
           return { ok: true };
+        case "openSourceTree":
+          if (options.sourceTreeUrl)
+            window.open(options.sourceTreeUrl, "_blank", "noopener");
+
+          return { ok: true };
         default:
-          // reveal, openDiff, focusWindow, captureScreenshot, openSourceTree,
-          // openReview…: Desktop-only surfaces with nothing to do here.
+          // reveal, openDiff, focusWindow, captureScreenshot, openReview…:
+          // Desktop-only surfaces with nothing to do here.
           return { ok: true };
       }
     },
