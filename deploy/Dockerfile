@@ -15,6 +15,9 @@ COPY apps/review-hub/ ./apps/review-hub/
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @dev.fast/review build:workspace-deps
 RUN pnpm --filter @dev.fast/review-hub build
+# The structural-diff binary the Diff tab and lenses need (Desktop bundles it;
+# a checkout fetches it). Lands in packages/review/bin, copied below.
+RUN pnpm --filter @dev.fast/review ensure:diffr
 
 # Production runtime stage
 FROM node:24-bookworm-slim AS runner
@@ -41,6 +44,7 @@ ENV REVIEW_HUB_PORT=8787
 ENV REVIEW_HUB_HOST=0.0.0.0
 ENV REVIEW_HUB_HOME=/data
 ENV REVIEW_HUB_ORIGIN=http://localhost:8787
+ENV REVIEW_DIFFR_BINARY=/app/packages/review/bin/diffr
 
 VOLUME ["/data"]
 EXPOSE 8787
