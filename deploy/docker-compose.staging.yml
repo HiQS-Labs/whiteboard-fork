@@ -1,0 +1,32 @@
+# Review Hub on the ltvera-staging GCE VM: its own compose project, joined to
+# the LTVera-Pandas stack's network so that stack's Caddy can proxy
+# reviews-stg.ltvera.com to it by name. No published ports; only Caddy reaches
+# it. Run from this checkout's root (see docs/review-hub-ops.md):
+#   docker compose -p review-hub -f deploy/docker-compose.staging.yml up -d --build
+services:
+  review-hub:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: whiteboard-review-hub:staging
+    container_name: whiteboard-review-hub
+    restart: unless-stopped
+    # REVIEW_HUB_TOKEN, REVIEW_HUB_USER, REVIEW_HUB_PASSWORD, REVIEW_HUB_ORIGIN,
+    # GITHUB_TOKEN. Copy of record: Secret Manager `review-hub-staging-env`.
+    env_file: /home/ltvera/review-hub/.env
+    environment:
+      REVIEW_HUB_HOST: 0.0.0.0
+      REVIEW_HUB_PORT: "8787"
+    volumes:
+      - review-hub-data:/data
+    networks:
+      default:
+        aliases: [review-hub]
+
+networks:
+  default:
+    name: ltvera-pandas_default
+    external: true
+
+volumes:
+  review-hub-data:

@@ -1,0 +1,271 @@
+/* Web fallbacks for the Desktop's native surfaces (inline editor, diff). */
+
+/* The Desktop's Monaco metrics: 12px/18px, ligatures off. The canvas's own
+   `pre` rule sets a generic monospace, so the code elements are named here. */
+.hub-inline-editor,
+.hub-inline-editor__code,
+.hub-diff,
+.hub-diff__body {
+  font:
+    12px/18px "Geist Mono",
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  font-feature-settings:
+    "calt" 0,
+    "liga" 0;
+  color: inherit;
+}
+
+.hub-inline-editor__status,
+.hub-diff__status {
+  padding: 12px 16px;
+  opacity: 0.7;
+}
+
+.hub-inline-editor__code {
+  margin: 0;
+  padding: 6px 0;
+  overflow: auto;
+  tab-size: 2;
+}
+
+.hub-inline-editor__line,
+.hub-diff__line {
+  display: grid;
+  grid-template-columns: 3.5em 1fr;
+  white-space: pre;
+}
+
+.hub-diff__line {
+  grid-template-columns: 3.5em 3.5em 1fr;
+}
+
+.hub-inline-editor__line--authored {
+  background: color-mix(in srgb, currentColor 7%, transparent);
+}
+
+.hub-inline-editor__number,
+.hub-diff__number {
+  padding-right: 1em;
+  text-align: right;
+  opacity: 0.4;
+  user-select: none;
+}
+
+.hub-inline-editor__gap,
+.hub-diff__hunk {
+  padding: 2px 1em;
+  opacity: 0.5;
+  font-size: 12px;
+  user-select: none;
+}
+
+.hub-inline-editor mark {
+  background: color-mix(in srgb, #e5a50a 45%, transparent);
+  color: inherit;
+}
+
+.hub-diff__file {
+  margin: 0 0 20px;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.hub-diff__file--viewed .hub-diff__body {
+  display: none;
+}
+
+.hub-diff__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.hub-diff__path {
+  flex: 1;
+  font-weight: 600;
+}
+
+.hub-diff__stats {
+  opacity: 0.6;
+}
+
+.hub-diff__viewed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.hub-diff__body {
+  overflow: auto;
+}
+
+.hub-diff__line--add {
+  background: color-mix(in srgb, #2ea043 18%, transparent);
+}
+
+.hub-diff__line--del {
+  background: color-mix(in srgb, #e5484d 18%, transparent);
+}
+
+.hub-diff__tree {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+}
+
+.hub-diff__tree-item {
+  color: inherit;
+  text-decoration: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hub-diff__tree-item:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+/* speed-highlight token colours, kept close to the canvas code figures. */
+.shj-syn-cmnt {
+  opacity: 0.55;
+  font-style: italic;
+}
+.shj-syn-kwd {
+  color: #c678dd;
+}
+.shj-syn-str {
+  color: #98c379;
+}
+.shj-syn-num,
+.shj-syn-bool {
+  color: #d19a66;
+}
+.shj-syn-func,
+.shj-syn-class {
+  color: #61afef;
+}
+.shj-syn-var {
+  color: #e06c75;
+}
+.shj-syn-type {
+  color: #56b6c2;
+}
+
+/* Source tree panel: the hub's stand-in for the Desktop explorer. Backgrounds
+   match the shell's Whiteboard Dark / Light so the canvas doesn't show through. */
+.hub-source-tree {
+  position: fixed;
+  inset: 44px 0 0 auto;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  width: min(1100px, 92vw);
+  background: #0c0f15;
+  color: #eef0f4;
+  border-left: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  box-shadow: -12px 0 32px rgb(0 0 0 / 0.25);
+  font:
+    13px/1.4 -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+}
+
+@media (prefers-color-scheme: light) {
+  .hub-source-tree {
+    background: #ffffff;
+    color: #15181e;
+  }
+}
+
+.hub-source-tree__header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 12px;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.hub-source-tree__title {
+  flex: 1;
+  font-weight: 600;
+}
+
+.hub-source-tree__header a {
+  color: inherit;
+  opacity: 0.75;
+}
+
+.hub-source-tree__close {
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.hub-source-tree__body {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  min-height: 0;
+  flex: 1;
+}
+
+.hub-source-tree__tree {
+  overflow: auto;
+  padding: 6px 0;
+  border-right: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.hub-source-tree__item {
+  display: block;
+  width: 100%;
+  padding: 3px 8px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.hub-source-tree__item:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.hub-source-tree__item--active {
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.hub-source-tree__viewer {
+  overflow: auto;
+  min-width: 0;
+}
+
+.hub-source-tree__file-path {
+  position: sticky;
+  top: 0;
+  padding: 6px 12px;
+  background: inherit;
+  font-weight: 600;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.hub-source-tree__code {
+  overflow: visible;
+}
